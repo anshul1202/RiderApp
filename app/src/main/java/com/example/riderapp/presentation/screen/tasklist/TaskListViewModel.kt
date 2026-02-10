@@ -84,7 +84,14 @@ class TaskListViewModel @Inject constructor(
                     searchQuery = query.ifBlank { null }
                 )
             }.collect { tasks ->
-                _uiState.update { it.copy(tasks = tasks, isLoading = false) }
+                _uiState.update {
+                    // Only clear loading if we actually have data or initial load is done
+                    val shouldStopLoading = tasks.isNotEmpty() || it.isInitialDataLoaded
+                    it.copy(
+                        tasks = tasks,
+                        isLoading = if (shouldStopLoading) false else it.isLoading
+                    )
+                }
             }
         }
 

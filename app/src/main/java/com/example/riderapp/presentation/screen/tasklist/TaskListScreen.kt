@@ -122,7 +122,7 @@ fun TaskListScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
             )
 
-            // Content
+            // Content — error state only shown after initial load attempt completes
             when {
                 uiState.isLoading -> {
                     Box(
@@ -134,7 +134,7 @@ fun TaskListScreen(
                         CircularProgressIndicator()
                     }
                 }
-                uiState.error != null && uiState.tasks.isEmpty() -> {
+                uiState.error != null && uiState.tasks.isEmpty() && !uiState.isLoading -> {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
