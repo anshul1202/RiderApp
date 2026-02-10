@@ -304,12 +304,34 @@ class TaskRepositoryImplTest {
             page = 0, size = 50, totalPages = 1, totalItems = 2
         )
 
+        coEvery { taskDao.getPendingTaskIds() } returns emptyList()
         coEvery { taskApi.getTasks(any(), any(), any()) } returns Response.success(page0)
         coEvery { taskDao.insertTasks(any()) } just Runs
 
         repository.fetchTasksFromServer("RIDER-001")
 
         coVerify { taskDao.insertTasks(match { it.size == 2 }) }
+    }
+
+    @Test
+    fun `fetchTasksFromServer skips tasks with pending local changes`() = runTest {
+        val page0 = PaginatedResponse(
+            data = listOf(
+                TaskDto("T-1", "DROP", "ASSIGNED", "R1", "A", "", "", "", 0, 0),
+                TaskDto("T-2", "PICKUP", "ASSIGNED", "R1", "B", "", "", "", 0, 0)
+            ),
+            page = 0, size = 50, totalPages = 1, totalItems = 2
+        )
+
+        // T-1 has pending local changes — should NOT be overwritten
+        coEvery { taskDao.getPendingTaskIds() } returns listOf("T-1")
+        coEvery { taskApi.getTasks(any(), any(), any()) } returns Response.success(page0)
+        coEvery { taskDao.insertTasks(any()) } just Runs
+
+        repository.fetchTasksFromServer("RIDER-001")
+
+        // Only T-2 should be inserted (T-1 skipped)
+        coVerify { taskDao.insertTasks(match { it.size == 1 && it[0].id == "T-2" }) }
     }
 
     @Test
@@ -321,6 +343,7 @@ class TaskRepositoryImplTest {
             page = 0, size = 50, totalPages = 20, totalItems = 1000
         )
 
+        coEvery { taskDao.getPendingTaskIds() } returns emptyList()
         coEvery { taskApi.getTasks(any(), any(), any()) } returns Response.success(page0)
         coEvery { taskDao.insertTasks(any()) } just Runs
 

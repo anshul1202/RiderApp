@@ -49,6 +49,10 @@ interface TaskDao {
     @Query("UPDATE tasks SET status = :status, updatedAt = :updatedAt, syncStatus = :syncStatus WHERE id = :taskId")
     suspend fun updateTaskStatus(taskId: String, status: String, updatedAt: Long, syncStatus: String)
 
+    /** Returns IDs of tasks that have pending (unsynced) local changes */
+    @Query("SELECT id FROM tasks WHERE syncStatus != 'SYNCED'")
+    suspend fun getPendingTaskIds(): List<String>
+
     @Query("SELECT COUNT(*) FROM tasks WHERE riderId = :riderId")
     suspend fun getTaskCount(riderId: String): Int
 

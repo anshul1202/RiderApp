@@ -110,6 +110,10 @@ class TaskRepositoryImpl @Inject constructor(
             var page = 0
             var totalPages = 1
 
+            // Get IDs of tasks with pending local changes — these must NOT be
+            // overwritten by stale server data (server doesn't know about them yet)
+            val pendingIds = taskDao.getPendingTaskIds().toSet()
+
             val pageSize = 50
             while (page < totalPages) {
                 val response = taskApi.getTasks(riderId = riderId, page = page, size = pageSize)
@@ -117,14 +121,19 @@ class TaskRepositoryImpl @Inject constructor(
                     val body = response.body()
                     if (body != null) {
                         totalPages = body.totalPages
-                        val entities = body.data.map { it.toEntity() }
-                        if (entities.isNotEmpty()) {
-                            taskDao.insertTasks(entities)
+                        val allEntities = body.data.map { it.toEntity() }
+
+                        // Skip tasks that have unsynced local changes
+                        val safeEntities = allEntities.filter { it.id !in pendingIds }
+
+                        if (safeEntities.isNotEmpty()) {
+                            taskDao.insertTasks(safeEntities)
                         }
 
                         monitoringService.logEvent("tasks_fetched_page", mapOf(
                             "page" to page,
-                            "count" to entities.size,
+                            "count" to safeEntities.size,
+                            "skipped_pending" to (allEntities.size - safeEntities.size),
                             "totalPages" to totalPages
                         ))
 
