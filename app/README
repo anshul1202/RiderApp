@@ -1,0 +1,46 @@
+Act as a staff android engineer to design and build a simplified rider delivery application that supports working offline
+
+Codebase and Architecture : 
+1) Structure the app using MVVM + Clean architecture with dependency injection with Hilt 
+2) Use RoomDB for offline storage 
+3) For now you can mock the JSON for the backend data 
+4) Use WorkManager for syncing the offline data 
+
+Failure Handling
+1) Handle failure cases where WorkManager Crashes , API fails , Partial data success
+2) Notify user , developer and monitoring systems for alerts 
+
+Context
+In logistics, riders frequently operate in areas with unreliable or no connectivity, but delivery operations must continue without interruption.
+We want to evaluate how you design and implement an offline-capable rider workflow.
+Problem Statement
+Design and build a simplified rider delivery application that supports working offline.
+A rider should be able to:
+Create new pickup tasks or
+View their assigned delivery tasks
+Perform task actions while offline
+ (e.g., pickup, delivered, failed delivery)
+Ensure everything syncs back to the server in a timely fashion
+Ensure this works at scale across tens of thousands of riders and thousands of shipments for each rider.
+Expectations
+We are interested in how you think about:
+Offline data storage
+Capturing and syncing rider actions reliably
+Handling edge cases and failure scenarios
+Tradeoffs in design and implementation
+Handling scale (1000 records)
+Observability/monitoring/debugging potential issues
+Deliverables
+Please submit:
+Architecture Notes (1–2 pages)
+Explain your approach, including key design decisions and tradeoffs. Also, understand how you work with AI to implement the entire functionality.
+Working Prototype
+A minimal implementation demonstrating the following:
+A basic task flow where in tasks can be of type pickup or drop
+For each task there may be multiple actions (e.g. reached, delivered, returned etc.)
+Ability to run all these actions in an offline manner and sync the data when network is available.
+Backend can be mocked or simplified.
+Short README
+How to run the project and what scenarios to try.
+
+Before proceeeding ask me any doubts about technologies to use or any other functionality
