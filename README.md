@@ -247,6 +247,60 @@ ViewModel → PerformTaskActionUseCase → TaskRepository
 
 ---
 
+## AI-Assisted Development — What I Designed vs Generated
+
+### Tools Used
+
+- **Cursor IDE** — AI-powered code editor (primary development environment)
+- **Claude (AI Assistant)** — Architecture design, code generation, and review within Cursor
+- **MockerAPI** — Free hosted mock API service for realistic GET/POST endpoints
+- **Android Studio** — Build, run, and on-device testing
+- **Logcat** — Runtime debugging and monitoring verification
+
+### How I Used AI
+
+| Phase | My Role (Designed) | AI Role (Generated) |
+|-------|-------------------|---------------------|
+| **Architecture** | Decided MVVM + Clean Architecture, offline-first approach, server-wins conflict resolution, Room as single source of truth | Structured the layer separation, suggested package layout, generated DI module wiring |
+| **Task state machine** | Defined the PICKUP/DROP flows and which actions lead to which statuses | Generated the `ActionType` enum with `getAvailableActions()` and `getResultingStatus()` helper functions |
+| **Sync strategy** | Chose batched sync with configurable exponential backoff, two-tier retry (per-batch + WorkManager) | Generated the `SyncConfig` data class, batch loop in `syncActions()`, `SyncWorker` and `SyncManager` implementations |
+| **Data models** | Specified all field names, types, and relationships (Task, TaskAction, enums) | Generated Entity, DTO, Domain model classes and the mapper between them |
+| **API design** | Defined the 5 endpoints, request/response JSON shapes, pagination structure | Generated Retrofit interface, `MockInterceptor`, and mock data (1000 Indian addresses/names) |
+| **UI/UX** | Specified screen layouts (list with search + filters, detail with timeline), Material3 theme colors, status color coding | Generated Jetpack Compose screens, components (`TaskCard`, `SyncStatusBar`, `CreateTaskDialog`), theme files |
+| **Failure handling** | Defined failure scenarios (no network, API error, partial sync, worker crash) and how each should be handled | Generated implementation: retry logic, `SyncMonitor` health tracking, monitoring service with structured logging |
+| **Testing** | Chose what to test (state machine, mapper round-trips, batched sync, ViewModels) and edge cases | Generated 80 test cases using MockK, verified they all pass |
+| **Mock APIs** | Created mock endpoints on mockerapi.com with correct JSON shapes | Generated the `MockInterceptor` hybrid (real network for GET/sync, local mock for create/action) |
+
+### What I Designed (Decision-Making)
+
+- Offline-first architecture with Room as the single source of truth
+- Server-wins conflict resolution strategy for logistics use case
+- Task state machine (PICKUP and DROP flows with terminal states)
+- Batched sync at scale (50 records/batch) to handle 1000+ actions
+- Two-tier retry: per-batch exponential backoff + WorkManager-level retry
+- Configurable `SyncConfig` so all retry/backoff params can be tuned without code changes
+- Search across multiple fields (ID, name, phone, address, description) with debounce
+- Mock monitoring that simulates Sentry (errors) and Datadog (metrics/events)
+- API contract design (5 endpoints with pagination, batch sync, partial success responses)
+
+### What AI Generated (Implementation)
+
+- ~50 Kotlin source files following the architecture I specified
+- Room entities, DAOs with SQL queries, database setup
+- Retrofit API interface + OkHttp mock interceptor
+- Hilt DI modules (Database, Network, Repository, App)
+- Jetpack Compose UI (2 screens, 3 components, navigation, Material3 theme)
+- ViewModels with StateFlow, combined filter + search with debounce
+- WorkManager sync worker with crash recovery
+- 80 unit tests across 6 test files
+- Build configuration (Gradle version catalog, dependency management)
+
+### Key Insight
+
+AI was most valuable for **boilerplate-heavy layers** (entities, DTOs, mappers, DI modules, Compose UI scaffolding) and **test generation**. The critical thinking — architecture decisions, failure mode analysis, sync strategy, state machine design, and scale considerations — was done by me. AI acted as a high-speed implementation partner that I directed and reviewed at each step.
+
+---
+
 ## License
 
 This project is a technical assessment prototype.

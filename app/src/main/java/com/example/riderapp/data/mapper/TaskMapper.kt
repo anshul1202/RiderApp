@@ -5,6 +5,7 @@ import com.example.riderapp.data.local.entity.TaskEntity
 import com.example.riderapp.data.remote.dto.TaskActionDto
 import com.example.riderapp.data.remote.dto.TaskDto
 import com.example.riderapp.domain.model.*
+import com.example.riderapp.util.Constants
 
 object TaskMapper {
 
@@ -40,12 +41,18 @@ object TaskMapper {
         )
     }
 
+    /**
+     * Maps API DTO to Room entity.
+     * Overrides riderId to the local rider — in production the server
+     * only returns tasks for the authenticated rider, but the mock API
+     * returns tasks for multiple riders.
+     */
     fun TaskDto.toEntity(): TaskEntity {
         return TaskEntity(
             id = id,
             type = type,
             status = status,
-            riderId = riderId,
+            riderId = Constants.RIDER_ID,
             customerName = customerName,
             customerPhone = customerPhone,
             address = address,

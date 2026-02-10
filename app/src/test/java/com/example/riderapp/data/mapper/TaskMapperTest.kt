@@ -91,12 +91,12 @@ class TaskMapperTest {
     // ── TaskDto -> TaskEntity ────────────────────────────────────
 
     @Test
-    fun `TaskDto maps to TaskEntity with SYNCED status`() {
+    fun `TaskDto maps to TaskEntity with SYNCED status and local rider ID`() {
         val dto = TaskDto(
             id = "TASK-0001",
             type = "DROP",
             status = "DELIVERED",
-            riderId = "RIDER-001",
+            riderId = "RIDER-999",  // Different rider from API
             customerName = "Test User",
             customerPhone = "+910000000000",
             address = "Test Address",
@@ -111,6 +111,7 @@ class TaskMapperTest {
         assertEquals("DROP", entity.type)
         assertEquals("DELIVERED", entity.status)
         assertEquals("SYNCED", entity.syncStatus)  // DTOs from server are always SYNCED
+        assertEquals("RIDER-001", entity.riderId)  // Overridden to local rider
     }
 
     // ── TaskActionEntity -> TaskAction (Domain) ──────────────────

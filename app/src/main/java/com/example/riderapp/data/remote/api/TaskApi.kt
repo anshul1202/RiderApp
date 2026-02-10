@@ -8,10 +8,10 @@ interface TaskApi {
 
     /**
      * Fetch tasks from the real mocker API.
-     * URL: https://free.mockerapi.com/mock/f8ecd9ce-b35f-49ef-b3d9-49dffc7363d5
+     * URL: https://free.mockerapi.com/mock/97cb8e56-ab2a-48be-812e-47188382969b
      * Query params are sent but the mock endpoint may ignore them.
      */
-    @GET("mock/f8ecd9ce-b35f-49ef-b3d9-49dffc7363d5")
+    @GET("mock/97cb8e56-ab2a-48be-812e-47188382969b")
     suspend fun getTasks(
         @Query("riderId") riderId: String,
         @Query("page") page: Int = 0,
