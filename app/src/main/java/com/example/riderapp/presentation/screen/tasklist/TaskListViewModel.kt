@@ -49,6 +49,9 @@ class TaskListViewModel @Inject constructor(
     private val _typeFilter = MutableStateFlow<TaskType?>(null)
     private val _searchQuery = MutableStateFlow("")
 
+    /** Prevents concurrent loadInitialData calls */
+    private var isLoadingData = false
+
     init {
         // Observe network status
         viewModelScope.launch {
@@ -56,9 +59,6 @@ class TaskListViewModel @Inject constructor(
                 _uiState.update { it.copy(isOnline = online) }
                 if (online && !_uiState.value.isInitialDataLoaded) {
                     loadInitialData()
-                }
-                if (online) {
-                    syncManager.triggerImmediateSync()
                 }
             }
         }
@@ -90,12 +90,12 @@ class TaskListViewModel @Inject constructor(
 
         // Schedule periodic sync
         syncManager.schedulePeriodicSync()
-
-        // Try to load initial data
-        loadInitialData()
     }
 
     private fun loadInitialData() {
+        if (isLoadingData) return  // Prevent duplicate concurrent calls
+        isLoadingData = true
+
         viewModelScope.launch {
             try {
                 _uiState.update { it.copy(isLoading = true, error = null) }
@@ -107,6 +107,8 @@ class TaskListViewModel @Inject constructor(
                     isLoading = false
                 )}
                 monitoringService.logError(e, mapOf("operation" to "loadInitialData"))
+            } finally {
+                isLoadingData = false
             }
         }
     }
