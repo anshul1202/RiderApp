@@ -71,9 +71,14 @@ class TaskDetailViewModel @Inject constructor(
     }
 
     fun performAction(actionType: ActionType, notes: String? = null) {
+        // Guard: prevent duplicate taps while an action is already in progress
+        if (_uiState.value.actionInProgress) return
+
+        // Set flag immediately (synchronously) before launching coroutine
+        _uiState.update { it.copy(actionInProgress = true, error = null) }
+
         viewModelScope.launch {
             try {
-                _uiState.update { it.copy(actionInProgress = true, error = null) }
                 performTaskActionUseCase(taskId, actionType, notes)
                 _uiState.update { it.copy(
                     actionInProgress = false,
