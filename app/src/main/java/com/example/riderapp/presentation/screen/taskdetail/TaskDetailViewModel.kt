@@ -3,6 +3,7 @@ package com.example.riderapp.presentation.screen.taskdetail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.util.Log
 import com.example.riderapp.data.sync.SyncManager
 import com.example.riderapp.domain.model.ActionType
 import com.example.riderapp.domain.model.Task
@@ -39,7 +40,12 @@ class TaskDetailViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(TaskDetailUiState())
     val uiState: StateFlow<TaskDetailUiState> = _uiState.asStateFlow()
 
+    companion object {
+        private const val TAG = "TaskDetailVM"
+    }
+
     init {
+        Log.d(TAG, "init — loading task $taskId")
         loadTask()
     }
 
@@ -47,12 +53,15 @@ class TaskDetailViewModel @Inject constructor(
         // Observe task
         viewModelScope.launch {
             getTaskDetailUseCase.getTask(taskId).collect { task ->
+                val availableActions = if (task != null) {
+                    ActionType.getAvailableActions(task.type, task.status)
+                } else {
+                    emptyList()
+                }
+                Log.d(TAG, "task emitted — id=$taskId, type=${task?.type}, " +
+                        "status=${task?.status}, syncStatus=${task?.syncStatus}, " +
+                        "availableActions=${availableActions.map { it.name }}")
                 _uiState.update { state ->
-                    val availableActions = if (task != null) {
-                        ActionType.getAvailableActions(task.type, task.status)
-                    } else {
-                        emptyList()
-                    }
                     state.copy(
                         task = task,
                         isLoading = false,
@@ -65,6 +74,8 @@ class TaskDetailViewModel @Inject constructor(
         // Observe actions
         viewModelScope.launch {
             getTaskDetailUseCase.getActions(taskId).collect { actions ->
+                Log.d(TAG, "actions emitted — taskId=$taskId, count=${actions.size}, " +
+                        "actions=${actions.map { "${it.actionType.name}(synced=${it.isSynced})" }}")
                 _uiState.update { it.copy(actions = actions) }
             }
         }
@@ -72,7 +83,12 @@ class TaskDetailViewModel @Inject constructor(
 
     fun performAction(actionType: ActionType, notes: String? = null) {
         // Guard: prevent duplicate taps while an action is already in progress
-        if (_uiState.value.actionInProgress) return
+        if (_uiState.value.actionInProgress) {
+            Log.w(TAG, "performAction(${actionType.name}) BLOCKED — action already in progress")
+            return
+        }
+
+        Log.d(TAG, "performAction() taskId=$taskId, action=${actionType.name}, notes=$notes")
 
         // Set flag immediately (synchronously) before launching coroutine
         _uiState.update { it.copy(actionInProgress = true, error = null) }
@@ -80,6 +96,7 @@ class TaskDetailViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 performTaskActionUseCase(taskId, actionType, notes)
+                Log.d(TAG, "performAction() SUCCESS — ${actionType.displayName}")
                 _uiState.update { it.copy(
                     actionInProgress = false,
                     actionSuccess = "${actionType.displayName} completed"
@@ -90,6 +107,7 @@ class TaskDetailViewModel @Inject constructor(
                     "action" to actionType.name
                 ))
             } catch (e: Exception) {
+                Log.e(TAG, "performAction() FAILED — ${actionType.name}: ${e.message}", e)
                 _uiState.update { it.copy(
                     actionInProgress = false,
                     error = "Failed: ${e.message}"

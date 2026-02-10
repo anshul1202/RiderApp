@@ -14,6 +14,7 @@ import com.example.riderapp.monitoring.MonitoringService
 import com.example.riderapp.util.Constants
 import com.example.riderapp.util.NetworkMonitor
 import dagger.hilt.android.lifecycle.HiltViewModel
+import android.util.Log
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
@@ -52,12 +53,20 @@ class TaskListViewModel @Inject constructor(
     /** Prevents concurrent loadInitialData calls */
     private var isLoadingData = false
 
+    companion object {
+        private const val TAG = "TaskListVM"
+    }
+
     init {
+        Log.d(TAG, "init — ViewModel created")
+
         // Observe network status
         viewModelScope.launch {
             networkMonitor.isOnline.collect { online ->
+                Log.d(TAG, "network status changed: online=$online")
                 _uiState.update { it.copy(isOnline = online) }
                 if (online && !_uiState.value.isInitialDataLoaded) {
+                    Log.d(TAG, "online + not loaded → triggering loadInitialData()")
                     loadInitialData()
                 }
             }
@@ -66,6 +75,7 @@ class TaskListViewModel @Inject constructor(
         // Observe unsynced count
         viewModelScope.launch {
             fetchTasksUseCase.getUnsyncedCount().collect { count ->
+                Log.d(TAG, "unsynced action count: $count")
                 _uiState.update { it.copy(unsyncedCount = count) }
             }
         }
@@ -78,14 +88,15 @@ class TaskListViewModel @Inject constructor(
             ) { filter, query ->
                 Pair(filter, query)
             }.flatMapLatest { (filter, query) ->
+                Log.d(TAG, "query changed → filter=$filter, search='${query.ifBlank { "(none)" }}'")
                 getTasksUseCase(
                     riderId = Constants.RIDER_ID,
                     typeFilter = filter,
                     searchQuery = query.ifBlank { null }
                 )
             }.collect { tasks ->
+                Log.d(TAG, "Room emitted ${tasks.size} tasks (isInitialDataLoaded=${_uiState.value.isInitialDataLoaded})")
                 _uiState.update {
-                    // Only clear loading if we actually have data or initial load is done
                     val shouldStopLoading = tasks.isNotEmpty() || it.isInitialDataLoaded
                     it.copy(
                         tasks = tasks,
@@ -97,18 +108,25 @@ class TaskListViewModel @Inject constructor(
 
         // Schedule periodic sync
         syncManager.schedulePeriodicSync()
+        Log.d(TAG, "init — periodic sync scheduled")
     }
 
     private fun loadInitialData() {
-        if (isLoadingData) return  // Prevent duplicate concurrent calls
+        if (isLoadingData) {
+            Log.d(TAG, "loadInitialData() skipped — already loading")
+            return
+        }
         isLoadingData = true
+        Log.d(TAG, "loadInitialData() started — fetching from server")
 
         viewModelScope.launch {
             try {
                 _uiState.update { it.copy(isLoading = true, error = null) }
                 fetchTasksUseCase(Constants.RIDER_ID)
+                Log.d(TAG, "loadInitialData() success — data loaded")
                 _uiState.update { it.copy(isInitialDataLoaded = true, isLoading = false) }
             } catch (e: Exception) {
+                Log.e(TAG, "loadInitialData() failed: ${e.message}", e)
                 _uiState.update { it.copy(
                     error = "Failed to load tasks: ${e.message}",
                     isLoading = false
@@ -121,25 +139,30 @@ class TaskListViewModel @Inject constructor(
     }
 
     fun setTypeFilter(filter: TaskType?) {
+        Log.d(TAG, "setTypeFilter($filter)")
         _typeFilter.value = filter
         _uiState.update { it.copy(typeFilter = filter) }
     }
 
     fun setSearchQuery(query: String) {
+        Log.d(TAG, "setSearchQuery('$query')")
         _searchQuery.value = query
         _uiState.update { it.copy(searchQuery = query) }
     }
 
     fun clearSearch() {
+        Log.d(TAG, "clearSearch()")
         _searchQuery.value = ""
         _uiState.update { it.copy(searchQuery = "") }
     }
 
     fun refreshTasks() {
+        Log.d(TAG, "refreshTasks() — manual refresh")
         loadInitialData()
     }
 
     fun triggerSync() {
+        Log.d(TAG, "triggerSync() — manual sync")
         syncManager.triggerImmediateSync()
         monitoringService.logEvent("manual_sync_triggered")
     }
@@ -166,10 +189,13 @@ class TaskListViewModel @Inject constructor(
                     updatedAt = now,
                     syncStatus = SyncStatus.PENDING
                 )
+                Log.d(TAG, "createTask() id=${task.id}, customer=$customerName")
                 createTaskUseCase(task)
+                Log.d(TAG, "createTask() success — triggering sync")
                 syncManager.triggerImmediateSync()
                 monitoringService.logEvent("task_created_locally", mapOf("taskId" to task.id))
             } catch (e: Exception) {
+                Log.e(TAG, "createTask() failed: ${e.message}", e)
                 _uiState.update { it.copy(error = "Failed to create task: ${e.message}") }
                 monitoringService.logError(e, mapOf("operation" to "createTask"))
             }

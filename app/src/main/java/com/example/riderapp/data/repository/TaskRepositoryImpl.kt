@@ -35,6 +35,7 @@ class TaskRepositoryImpl @Inject constructor(
 
     override fun getTasks(riderId: String, typeFilter: TaskType?, searchQuery: String?): Flow<List<Task>> {
         val query = searchQuery?.trim()
+        Log.d(TAG, "getTasks() riderId=$riderId, filter=$typeFilter, search='${query ?: ""}'")
         return when {
             !query.isNullOrBlank() && typeFilter != null ->
                 taskDao.searchTasksByType(riderId, typeFilter.name, query)
@@ -45,16 +46,23 @@ class TaskRepositoryImpl @Inject constructor(
             else ->
                 taskDao.getTasksByRider(riderId)
         }.map { entities ->
+            Log.d(TAG, "getTasks() emitted ${entities.size} tasks from Room")
             entities.map { it.toDomain() }
         }
     }
 
     override fun getTaskById(taskId: String): Flow<Task?> {
-        return taskDao.getTaskById(taskId).map { it?.toDomain() }
+        Log.d(TAG, "getTaskById() taskId=$taskId")
+        return taskDao.getTaskById(taskId).map { entity ->
+            val domain = entity?.toDomain()
+            Log.d(TAG, "getTaskById() $taskId → status=${domain?.status}, syncStatus=${domain?.syncStatus}")
+            domain
+        }
     }
 
     override fun getActionsByTaskId(taskId: String): Flow<List<TaskAction>> {
         return taskActionDao.getActionsByTaskId(taskId).map { entities ->
+            Log.d(TAG, "getActionsByTaskId() $taskId → ${entities.size} actions")
             entities.map { it.toDomain() }
         }
     }
@@ -67,6 +75,8 @@ class TaskRepositoryImpl @Inject constructor(
         val now = System.currentTimeMillis()
         val actionId = UUID.randomUUID().toString()
 
+        Log.d(TAG, "performAction() taskId=$taskId, action=${actionType.name}, actionId=$actionId")
+
         // Create action record (unsynced)
         val actionEntity = TaskActionEntity(
             id = actionId,
@@ -77,6 +87,7 @@ class TaskRepositoryImpl @Inject constructor(
             isSynced = false
         )
         taskActionDao.insertAction(actionEntity)
+        Log.d(TAG, "performAction() inserted action record (unsynced)")
 
         // Update task status locally
         val newStatus = ActionType.getResultingStatus(actionType)
@@ -86,6 +97,7 @@ class TaskRepositoryImpl @Inject constructor(
             updatedAt = now,
             syncStatus = SyncStatus.PENDING.name
         )
+        Log.d(TAG, "performAction() task $taskId status updated to ${newStatus.name} (PENDING)")
 
         monitoringService.logEvent("task_action_performed", mapOf(
             "taskId" to taskId,
@@ -95,8 +107,10 @@ class TaskRepositoryImpl @Inject constructor(
     }
 
     override suspend fun createTask(task: Task) {
+        Log.d(TAG, "createTask() id=${task.id}, type=${task.type}, customer=${task.customerName}")
         val entity = task.toEntity()
         taskDao.insertTask(entity)
+        Log.d(TAG, "createTask() inserted into Room (syncStatus=PENDING)")
 
         monitoringService.logEvent("task_created", mapOf(
             "taskId" to task.id,

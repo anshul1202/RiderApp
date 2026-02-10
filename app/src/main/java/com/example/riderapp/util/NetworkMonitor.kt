@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -17,20 +18,27 @@ import javax.inject.Singleton
 class NetworkMonitor @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
+    companion object {
+        private const val TAG = "NetworkMonitor"
+    }
+
     val isOnline: Flow<Boolean> = callbackFlow {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
+                Log.d(TAG, "onAvailable() — network connected")
                 trySend(true)
             }
 
             override fun onLost(network: Network) {
+                Log.d(TAG, "onLost() — network disconnected")
                 trySend(false)
             }
 
             override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
                 val hasInternet = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                Log.d(TAG, "onCapabilitiesChanged() — hasInternet=$hasInternet")
                 trySend(hasInternet)
             }
         }
@@ -45,9 +53,11 @@ class NetworkMonitor @Inject constructor(
         val activeNetwork = connectivityManager.activeNetwork
         val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
         val isConnected = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+        Log.d(TAG, "initial network state: online=$isConnected")
         trySend(isConnected)
 
         awaitClose {
+            Log.d(TAG, "unregistering network callback")
             connectivityManager.unregisterNetworkCallback(callback)
         }
     }.distinctUntilChanged()
