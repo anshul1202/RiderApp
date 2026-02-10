@@ -227,6 +227,81 @@ The app uses real mock APIs hosted on [mockerapi.com](https://free.mockerapi.com
 
 ---
 
+## Database Schema
+
+### Table: `tasks`
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | TEXT | **PRIMARY KEY** | Task ID (e.g., `TASK-0001`, `LOCAL-A3F2B1C9`) |
+| `type` | TEXT | NOT NULL | `PICKUP` or `DROP` |
+| `status` | TEXT | NOT NULL | `ASSIGNED`, `REACHED`, `PICKED_UP`, `DELIVERED`, `FAILED_PICKUP`, `FAILED_DELIVERY`, `RETURNED` |
+| `riderId` | TEXT | NOT NULL | Rider identifier (e.g., `RIDER-001`) |
+| `customerName` | TEXT | NOT NULL | Customer full name |
+| `customerPhone` | TEXT | NOT NULL | Phone number with country code |
+| `address` | TEXT | NOT NULL | Delivery/pickup address |
+| `description` | TEXT | NOT NULL | Task notes/instructions |
+| `createdAt` | INTEGER | NOT NULL | Creation timestamp (epoch millis) |
+| `updatedAt` | INTEGER | NOT NULL | Last update timestamp (epoch millis) |
+| `syncStatus` | TEXT | NOT NULL, DEFAULT `'SYNCED'` | `SYNCED`, `PENDING`, `FAILED` |
+
+### Table: `task_actions`
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | TEXT | **PRIMARY KEY** | UUID for the action |
+| `taskId` | TEXT | NOT NULL, **INDEXED** | FK reference to `tasks.id` |
+| `actionType` | TEXT | NOT NULL | `REACH`, `PICK_UP`, `DELIVER`, `FAIL_PICKUP`, `FAIL_DELIVERY`, `RETURN` |
+| `timestamp` | INTEGER | NOT NULL | When the action was performed (epoch millis) |
+| `latitude` | REAL | NULLABLE | GPS latitude (future use) |
+| `longitude` | REAL | NULLABLE | GPS longitude (future use) |
+| `notes` | TEXT | NULLABLE | Rider notes (e.g., failure reason) |
+| `isSynced` | INTEGER | NOT NULL, DEFAULT `0` | `0` = pending, `1` = synced |
+| `retryCount` | INTEGER | NOT NULL, DEFAULT `0` | Times this action has been retried |
+| `lastError` | TEXT | NULLABLE | Last sync error message |
+
+### Entity Relationship
+
+```
+┌──────────────┐         ┌──────────────────┐
+│    tasks     │         │   task_actions    │
+├──────────────┤         ├──────────────────┤
+│ PK  id       │◄────────│     taskId (IDX)  │
+│     type     │   1:N   │ PK  id            │
+│     status   │         │     actionType    │
+│     riderId  │         │     timestamp     │
+│     customer │         │     notes         │
+│     address  │         │     isSynced      │
+│     syncStat │         │     retryCount    │
+│     updatedAt│         │     lastError     │
+└──────────────┘         └──────────────────┘
+```
+
+- **1 task → N actions** (one-to-many via `taskId`)
+- Actions are created locally (`isSynced=0`) and marked synced after successful API push
+- Tasks with `syncStatus != SYNCED` are protected from server overwrite during fetch
+
+### Key Queries
+
+```sql
+-- Batched sync (respects retry budget + configurable batch size)
+SELECT * FROM task_actions
+  WHERE isSynced = 0 AND retryCount < :maxRetries
+  ORDER BY timestamp ASC LIMIT :batchSize
+
+-- Search across multiple fields
+SELECT * FROM tasks WHERE riderId = :riderId
+  AND (id LIKE '%' || :query || '%'
+       OR customerName LIKE '%' || :query || '%'
+       OR address LIKE '%' || :query || '%')
+  ORDER BY updatedAt DESC
+
+-- Protect pending tasks from server overwrite
+SELECT id FROM tasks WHERE syncStatus != 'SYNCED'
+```
+
+---
+
 ## Data Flow
 
 ```
