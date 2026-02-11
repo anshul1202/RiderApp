@@ -20,6 +20,7 @@ mockk = "1.13.10"
 coroutinesTest = "1.8.0"
 turbine = "1.0.0"
 archCoreTesting = "2.2.0"
+paging = "3.2.1"
 
 [libraries]
 # AndroidX Core
@@ -56,6 +57,11 @@ hilt-compiler = { group = "androidx.hilt", name = "hilt-compiler", version.ref =
 room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+room-paging = { group = "androidx.room", name = "room-paging", version.ref = "room" }
+
+# Paging 3
+paging-runtime = { group = "androidx.paging", name = "paging-runtime", version.ref = "paging" }
+paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "paging" }
 
 # Retrofit + OkHttp
 retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }

@@ -1,6 +1,11 @@
 package com.example.riderapp.data.repository
 
+import android.content.SharedPreferences
 import android.util.Log
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import androidx.paging.map
 import com.example.riderapp.data.local.dao.TaskActionDao
 import com.example.riderapp.data.local.dao.TaskDao
 import com.example.riderapp.data.local.entity.TaskActionEntity
@@ -13,9 +18,14 @@ import com.example.riderapp.data.sync.SyncConfig
 import com.example.riderapp.domain.model.*
 import com.example.riderapp.domain.repository.TaskRepository
 import com.example.riderapp.monitoring.MonitoringService
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -26,12 +36,48 @@ class TaskRepositoryImpl @Inject constructor(
     private val taskActionDao: TaskActionDao,
     private val taskApi: TaskApi,
     private val syncConfig: SyncConfig,
-    private val monitoringService: MonitoringService
+    private val monitoringService: MonitoringService,
+    private val prefs: SharedPreferences
 ) : TaskRepository {
 
     companion object {
-        private const val TAG = "TaskRepositoryImpl"
+        private const val TAG = "TaskRepo"
+        private const val PREF_LAST_SYNC_TIME = "last_task_sync_timestamp"
+        private const val DB_WRITE_CHUNK_SIZE = 500
+        private const val MAX_PARALLEL_BATCHES = 3
     }
+
+    // ── Paging 3 (for 4K+ scale) ──────────────────────────────
+
+    override fun getTasksPaged(riderId: String, typeFilter: TaskType?, searchQuery: String?): Flow<PagingData<Task>> {
+        val query = searchQuery?.trim()
+        Log.d(TAG, "getTasksPaged() filter=$typeFilter, search='${query ?: ""}'")
+        return Pager(
+            config = PagingConfig(pageSize = 30, prefetchDistance = 10, initialLoadSize = 60),
+            pagingSourceFactory = {
+                when {
+                    !query.isNullOrBlank() && typeFilter != null ->
+                        taskDao.searchTasksByTypePaged(riderId, typeFilter.name, query)
+                    !query.isNullOrBlank() ->
+                        taskDao.searchTasksPaged(riderId, query)
+                    typeFilter != null ->
+                        taskDao.getTasksByRiderAndTypePaged(riderId, typeFilter.name)
+                    else ->
+                        taskDao.getTasksByRiderPaged(riderId)
+                }
+            }
+        ).flow.map { pagingData -> pagingData.map { it.toDomain() } }
+    }
+
+    override fun getTaskCountFlow(riderId: String, typeFilter: TaskType?): Flow<Int> {
+        return if (typeFilter != null) {
+            taskDao.getTaskCountByTypeFlow(riderId, typeFilter.name)
+        } else {
+            taskDao.getTaskCountFlow(riderId)
+        }
+    }
+
+    // ── Flow-based queries (detail screen, backward compat) ──
 
     override fun getTasks(riderId: String, typeFilter: TaskType?, searchQuery: String?): Flow<List<Task>> {
         val query = searchQuery?.trim()

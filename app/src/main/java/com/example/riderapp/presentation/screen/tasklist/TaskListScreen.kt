@@ -2,7 +2,6 @@ package com.example.riderapp.presentation.screen.tasklist
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
@@ -17,6 +16,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.paging.compose.collectAsLazyPagingItems
 import com.example.riderapp.domain.model.TaskType
 import com.example.riderapp.presentation.components.CreateTaskDialog
 import com.example.riderapp.presentation.components.SyncStatusBar
@@ -29,6 +29,7 @@ fun TaskListScreen(
     viewModel: TaskListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val pagingItems = viewModel.pagedTasks.collectAsLazyPagingItems()
     var showCreateDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -109,10 +110,10 @@ fun TaskListScreen(
                 onFilterSelected = { viewModel.setTypeFilter(it) }
             )
 
-            // Task count (reflects search + filter results)
+            // Task count (from reactive count query, separate from paging)
             Text(
                 text = buildString {
-                    append("${uiState.tasks.size} task${if (uiState.tasks.size != 1) "s" else ""}")
+                    append("${uiState.taskCount} task${if (uiState.taskCount != 1) "s" else ""}")
                     if (uiState.searchQuery.isNotBlank()) {
                         append(" matching \"${uiState.searchQuery}\"")
                     }
@@ -122,9 +123,9 @@ fun TaskListScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
             )
 
-            // Content — error state only shown after initial load attempt completes
+            // Content — Paging 3 powered list
             when {
-                uiState.isLoading -> {
+                uiState.isLoading && pagingItems.itemCount == 0 -> {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -134,7 +135,7 @@ fun TaskListScreen(
                         CircularProgressIndicator()
                     }
                 }
-                uiState.error != null && uiState.tasks.isEmpty() && !uiState.isLoading -> {
+                uiState.error != null && pagingItems.itemCount == 0 && !uiState.isLoading -> {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -158,7 +159,7 @@ fun TaskListScreen(
                         }
                     }
                 }
-                uiState.tasks.isEmpty() -> {
+                pagingItems.itemCount == 0 && !uiState.isLoading -> {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -199,14 +200,14 @@ fun TaskListScreen(
                             .weight(1f),
                         contentPadding = PaddingValues(vertical = 8.dp)
                     ) {
-                        items(
-                            items = uiState.tasks,
-                            key = { it.id }
-                        ) { task ->
-                            TaskCard(
-                                task = task,
-                                onClick = { onTaskClick(task.id) }
-                            )
+                        items(count = pagingItems.itemCount) { index ->
+                            val task = pagingItems[index]
+                            if (task != null) {
+                                TaskCard(
+                                    task = task,
+                                    onClick = { onTaskClick(task.id) }
+                                )
+                            }
                         }
                     }
                 }

@@ -15,6 +15,8 @@ import com.example.riderapp.util.Constants
 import com.example.riderapp.util.NetworkMonitor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import android.util.Log
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
@@ -23,7 +25,7 @@ import java.util.UUID
 import javax.inject.Inject
 
 data class TaskListUiState(
-    val tasks: List<Task> = emptyList(),
+    val taskCount: Int = 0,
     val isLoading: Boolean = true,
     val error: String? = null,
     val typeFilter: TaskType? = null,
@@ -80,26 +82,16 @@ class TaskListViewModel @Inject constructor(
             }
         }
 
-        // Observe tasks with combined filter + search (debounce search by 300ms)
+        // Observe task count (reactive, separate from Paging — for UI badge)
         viewModelScope.launch {
-            combine(
-                _typeFilter,
-                _searchQuery.debounce(300)
-            ) { filter, query ->
-                Pair(filter, query)
-            }.flatMapLatest { (filter, query) ->
-                Log.d(TAG, "query changed → filter=$filter, search='${query.ifBlank { "(none)" }}'")
-                getTasksUseCase(
-                    riderId = Constants.RIDER_ID,
-                    typeFilter = filter,
-                    searchQuery = query.ifBlank { null }
-                )
-            }.collect { tasks ->
-                Log.d(TAG, "Room emitted ${tasks.size} tasks (isInitialDataLoaded=${_uiState.value.isInitialDataLoaded})")
+            _typeFilter.flatMapLatest { filter ->
+                getTasksUseCase.count(Constants.RIDER_ID, filter)
+            }.collect { count ->
+                Log.d(TAG, "task count=$count (isInitialDataLoaded=${_uiState.value.isInitialDataLoaded})")
                 _uiState.update {
-                    val shouldStopLoading = tasks.isNotEmpty() || it.isInitialDataLoaded
+                    val shouldStopLoading = count > 0 || it.isInitialDataLoaded
                     it.copy(
-                        tasks = tasks,
+                        taskCount = count,
                         isLoading = if (shouldStopLoading) false else it.isLoading
                     )
                 }
@@ -110,6 +102,22 @@ class TaskListViewModel @Inject constructor(
         syncManager.schedulePeriodicSync()
         Log.d(TAG, "init — periodic sync scheduled")
     }
+
+    /** Paged task list — LazyColumn consumes via collectAsLazyPagingItems() */
+    @OptIn(FlowPreview::class)
+    val pagedTasks: Flow<PagingData<Task>> = combine(
+        _typeFilter,
+        _searchQuery.debounce(300)
+    ) { filter, query ->
+        Pair(filter, query)
+    }.flatMapLatest { (filter, query) ->
+        Log.d(TAG, "paging query → filter=$filter, search='${query.ifBlank { "(none)" }}'")
+        getTasksUseCase.paged(
+            riderId = Constants.RIDER_ID,
+            typeFilter = filter,
+            searchQuery = query.ifBlank { null }
+        )
+    }.cachedIn(viewModelScope)
 
     private fun loadInitialData() {
         if (isLoadingData) {

@@ -27,6 +27,8 @@ class TaskRepositoryImplTest {
     @MockK private lateinit var taskActionDao: TaskActionDao
     @MockK private lateinit var taskApi: TaskApi
     @MockK(relaxed = true) private lateinit var monitoringService: MonitoringService
+    @MockK(relaxed = true) private lateinit var prefs: android.content.SharedPreferences
+    @MockK(relaxed = true) private lateinit var prefsEditor: android.content.SharedPreferences.Editor
 
     private lateinit var repository: TaskRepositoryImpl
 
@@ -42,7 +44,10 @@ class TaskRepositoryImplTest {
     @Before
     fun setup() {
         MockKAnnotations.init(this)
-        repository = TaskRepositoryImpl(taskDao, taskActionDao, taskApi, syncConfig, monitoringService)
+        every { prefs.edit() } returns prefsEditor
+        every { prefsEditor.putLong(any(), any()) } returns prefsEditor
+        every { prefs.getLong(any(), any()) } returns 0L
+        repository = TaskRepositoryImpl(taskDao, taskActionDao, taskApi, syncConfig, monitoringService, prefs)
     }
 
     // ── getTasks ─────────────────────────────────────────────────

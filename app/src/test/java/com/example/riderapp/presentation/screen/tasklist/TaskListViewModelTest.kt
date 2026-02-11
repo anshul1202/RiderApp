@@ -46,6 +46,8 @@ class TaskListViewModelTest {
         every { networkMonitor.isOnline } returns flowOf(true)
         every { fetchTasksUseCase.getUnsyncedCount() } returns flowOf(0)
         every { getTasksUseCase(any(), any(), any()) } returns flowOf(emptyList())
+        every { getTasksUseCase.count(any(), any()) } returns flowOf(0)
+        every { getTasksUseCase.paged(any(), any(), any()) } returns flowOf(androidx.paging.PagingData.empty())
         coEvery { fetchTasksUseCase(any()) } just Runs
 
         return TaskListViewModel(
@@ -81,6 +83,8 @@ class TaskListViewModelTest {
         every { networkMonitor.isOnline } returns flowOf(true)
         every { fetchTasksUseCase.getUnsyncedCount() } returns flowOf(0)
         every { getTasksUseCase(any(), any(), any()) } returns flowOf(emptyList())
+        every { getTasksUseCase.count(any(), any()) } returns flowOf(0)
+        every { getTasksUseCase.paged(any(), any(), any()) } returns flowOf(androidx.paging.PagingData.empty())
         coEvery { fetchTasksUseCase(any()) } just Runs
 
         val viewModel = TaskListViewModel(
@@ -97,6 +101,8 @@ class TaskListViewModelTest {
         every { networkMonitor.isOnline } returns flowOf(false)
         every { fetchTasksUseCase.getUnsyncedCount() } returns flowOf(3)
         every { getTasksUseCase(any(), any(), any()) } returns flowOf(emptyList())
+        every { getTasksUseCase.count(any(), any()) } returns flowOf(0)
+        every { getTasksUseCase.paged(any(), any(), any()) } returns flowOf(androidx.paging.PagingData.empty())
 
         val viewModel = TaskListViewModel(
             getTasksUseCase, fetchTasksUseCase, createTaskUseCase,
@@ -114,6 +120,8 @@ class TaskListViewModelTest {
         every { networkMonitor.isOnline } returns flowOf(true)
         every { fetchTasksUseCase.getUnsyncedCount() } returns flowOf(5)
         every { getTasksUseCase(any(), any(), any()) } returns flowOf(emptyList())
+        every { getTasksUseCase.count(any(), any()) } returns flowOf(0)
+        every { getTasksUseCase.paged(any(), any(), any()) } returns flowOf(androidx.paging.PagingData.empty())
         coEvery { fetchTasksUseCase(any()) } just Runs
 
         val viewModel = TaskListViewModel(

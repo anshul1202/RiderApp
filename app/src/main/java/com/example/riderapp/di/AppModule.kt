@@ -1,6 +1,7 @@
 package com.example.riderapp.di
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.work.WorkManager
 import com.example.riderapp.data.sync.SyncConfig
 import dagger.Module
@@ -18,6 +19,12 @@ object AppModule {
     @Singleton
     fun provideWorkManager(@ApplicationContext context: Context): WorkManager {
         return WorkManager.getInstance(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideSharedPreferences(@ApplicationContext context: Context): SharedPreferences {
+        return context.getSharedPreferences("rider_app_prefs", Context.MODE_PRIVATE)
     }
 
     /**
